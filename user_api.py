@@ -14,13 +14,7 @@ def save_new_user():
     # transformation
     user_data['username'] = user_data['username'].capitalize()
 
-    address, domain = user_data['email'].split('@')
-    if domain == 'enterprise.com':
-        first_name, last_name = address.split('.')
-        user_data['email'] = '{}.{}@{}'.format(first_name[0].capitalize(), last_name, domain)
-
-    if domain == 'obsolete.com':
-        user_data['email'] = '{}@{}'.format(address, 'active.com')
+    user_data['email'] = modify_email(user_data['email'])
 
     # output
     path = os.path.join('db', 'users.txt')
@@ -30,3 +24,15 @@ def save_new_user():
         )
 
     return True
+
+
+def modify_email(email):
+    address, domain = email.split('@')
+    if domain == 'enterprise.com':
+        first_name, last_name = address.split('.')
+        return '{}.{}@{}'.format(first_name[0].capitalize(), last_name, domain)
+
+    if domain == 'obsolete.com':
+        return '{}@{}'.format(address, 'active.com')
+
+    return email

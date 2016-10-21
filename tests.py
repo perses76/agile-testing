@@ -4,14 +4,16 @@ from unittest import mock
 from user_api import save_new_user
 
 
-class SaveNewUserTestCase(unittest.TestCase):
-    def setUp(self):
+class SaveNewUserBase(unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        super(SaveNewUserBase, self).__init__(*args, **kwargs)
+
         self.open_patcher = mock.patch('user_api.open', name='user_api_open', create=True)
-        self.open_mock = self.open_patcher.start()
-
         self.request_patcher = mock.patch('user_api.request')
-        self.request_mock = self.request_patcher.start()
 
+    def setUp(self):
+        self.open_mock = self.open_patcher.start()
+        self.request_mock = self.request_patcher.start()
         self.set_read_data()
 
     def tearDown(self):
@@ -40,6 +42,13 @@ class SaveNewUserTestCase(unittest.TestCase):
         self.check_if_data_was_readed()
         return result
 
+    def test_default(self):
+        self.call_target()
+        self.assert_saved_data()
+
+
+class SaveNewUserTestCase(SaveNewUserBase):
+
     def test_success(self):
         self.set_read_data('john', 'john@test.com')
         self.call_target()
@@ -50,6 +59,8 @@ class SaveNewUserTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.call_target()
 
+
+class ModifyEmailTestCase(SaveNewUserBase):
     def test_enterprise_domain_modification(self):
         self.set_read_data(email='john.smith@enterprise.com')
         self.call_target()
