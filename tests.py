@@ -5,33 +5,50 @@ from user_api import save_new_user
 
 
 class SaveNewUserTestCase(unittest.TestCase):
-    @mock.patch('user_api.open', name='user_api_open', create=True)
-    @mock.patch('user_api.request')
-    def test_success(self, request_mock, open_mock):
-        request_mock.urlopen.return_value.read.return_value = b'{"username":"john", "email":"john@test.com"}'
+    def setUp(self):
+        self.open_patcher = mock.patch('user_api.open', name='user_api_open', create=True)
+        self.open_mock = self.open_patcher.start()
 
-        result = save_new_user()
+        self.request_patcher = mock.patch('user_api.request')
+        self.request_mock = self.request_patcher.start()
 
-        # check if result is True
-        self.assertTrue(result)
+        self.set_read_data()
 
-        # check if Request object was initialized properly
-        request_mock.urlopen.assert_called_once_with(url='https://test.com/new_user')
+    def tearDown(self):
+        self.open_patcher.stop()
+        self.request_patcher.stop()
 
-        # check if open correct file
+    def set_read_data(self, username='test user', email='test@test.com', raw=None):
+        if raw is None:
+            raw = '{{"username": "{}", "email": "{}"}}'.format(username, email).encode('utf-8')
+        self.request_mock.urlopen.return_value.read.return_value = raw
+
+    def assert_saved_data(self, username='Test user', email='test@test.com'):
         expected_path = os.path.join('db', 'users.txt')
-        open_mock.assert_called_once_with(expected_path, 'a')
+        self.open_mock.assert_called_once_with(expected_path, 'a')
 
-        # check if correct data was saved to the file
-        file_mock = open_mock.return_value.__enter__.return_value
-        file_mock.write.assert_called_once_with('"John", "john@test.com"\n')
+        file_mock = self.open_mock.return_value.__enter__.return_value
+        raw = '"{}", "{}"\n'.format(username, email)
+        file_mock.write.assert_called_once_with(raw)
 
-    @mock.patch('user_api.open', name='user_api_open', create=True)
-    @mock.patch('user_api.request')
-    def test_invalid_url_response_exception(self, request_mock, open_mock):
-        request_mock.urlopen.return_value.read.return_value = b'Invalid string'
+    def check_if_data_was_readed(self):
+        self.request_mock.urlopen.assert_called_once_with(url='https://test.com/new_user')
+
+    def call_target(self):
+        result = save_new_user()
+        self.assertTrue(result)
+        self.check_if_data_was_readed()
+        return result
+
+    def test_success(self):
+        self.set_read_data('john', 'john@test.com')
+        self.call_target()
+        self.assert_saved_data('John', 'john@test.com')
+
+    def test_invalid_url_response_exception(self):
+        self.set_read_data(raw=b'Invalid string')
         with self.assertRaises(ValueError):
-            save_new_user()
+            self.call_target()
 
 
 if __name__ == '__main__':
