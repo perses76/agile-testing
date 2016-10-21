@@ -26,6 +26,13 @@ class SaveNewUserTestCase(unittest.TestCase):
         file_mock = open_mock.return_value.__enter__.return_value
         file_mock.write.assert_called_once_with('"John", "john@test.com"\n')
 
+    @mock.patch('user_api.open', name='user_api_open', create=True)
+    @mock.patch('user_api.request')
+    def test_invalid_url_response_exception(self, request_mock, open_mock):
+        request_mock.urlopen.return_value.read.return_value = b'Invalid string'
+        with self.assertRaises(ValueError):
+            save_new_user()
+
 
 if __name__ == '__main__':
     unittest.main()
