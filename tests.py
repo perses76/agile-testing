@@ -1,7 +1,7 @@
 import os
 import unittest
 from unittest import mock
-from user_api import save_new_user
+from user_api import save_new_user, modify_email
 
 
 class SaveNewUserBase(unittest.TestCase):
@@ -60,7 +60,24 @@ class SaveNewUserTestCase(SaveNewUserBase):
             self.call_target()
 
 
-class ModifyEmailTestCase(SaveNewUserBase):
+class ModifyEmailTestCase(unittest.TestCase):
+    def setUp(self):
+        self.email = 'test@test.com'
+        self.result = None
+
+    def set_read_data(self, email):
+        self.email = email
+
+    def assert_saved_data(self, email='test@test.com'):
+        self.assertEqual(self.result, email)
+
+    def call_target(self):
+        self.result = modify_email(self.email)
+
+    def test_default(self):
+        self.call_target()
+        self.assert_saved_data()
+
     def test_enterprise_domain_modification(self):
         self.set_read_data(email='john.smith@enterprise.com')
         self.call_target()
