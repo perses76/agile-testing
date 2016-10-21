@@ -50,6 +50,16 @@ class SaveNewUserTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.call_target()
 
+    def test_enterprise_domain_modification(self):
+        self.set_read_data(email='john.smith@enterprise.com')
+        self.call_target()
+        self.assert_saved_data(email='J.smith@enterprise.com')
+
+    def test_obsolete_domain_modification(self):
+        self.set_read_data(email='test@obsolete.com')
+        self.call_target()
+        self.assert_saved_data(email='test@active.com')
+
 
 if __name__ == '__main__':
     unittest.main()
