@@ -46,7 +46,7 @@ def save_new_user():
 
     return True
 ```
-Yes. TDD requires to write tests before code. But first the article is not about TDD and second TDD is not aways good :)
+Yes. TDD requires to write tests before code. But the article is not about TDD and TDD is not aways good :)
 
 
 ## Step 1. Manual Testing. 
@@ -61,11 +61,11 @@ def test_save_new_user():
 
 We just run our tests: `python tests.py`.
 Advatages: You dont spend time for test writing.
-Disadvanges: You spend time for testing. You have manually to check if text file contains correct data. Another backdraw is you dont have test data, you have to work with real.
+Disadvanges: Run all tests manually takes a lot of time. You need to compare result with some expected data (usually saved in doc). There is no test environment or data, we work with real data on prod environment
 
-A lot of developer uses manual tests, but never admit it or consider bad practice. I beleive that Manual testing has rights to exists, 
+A lot of developer uses manual tests, but never admit or consider it as  abad practice. I beleive that Manual testing has rights to exists, 
 while developers clearly understand its advatages and limitation.
-As example of appropiate use of manual testing, think about one time small script. You dont want to spend most of your time to write test. 
+As example of appropiate use of manual testing, think about a one-time small script. You dont want to spend most of your time to write test. 
 
 
 ## Step 2. First TestCase
@@ -78,28 +78,140 @@ The standard unittes.mock library is used to mock http requests and open file.
 I hope no more comments needed about this step as it is quite standard way to write tests.
 
 ## Step 3 add exeption testing
+Branch: [S3_exception_test](tree/S3_exception_test)
+
+We add second test method to test if our code handle an invalid input.
+
+Test looks like this[full source](blob/S3_exception_test/tests.py):
+```python
+@mock.patch('user_api.open', name='user_api_open', create=True)
+@mock.patch('user_api.request')
+def test_invalid_url_response_exception(self, request_mock, open_mock):
+    request_mock.urlopen.return_value.read.return_value = b'Invalid string'
+    with self.assertRaises(ValueError):
+        save_new_user()
+```
 
 ## Step 4 Test refactoring
+Branch: [S4_refactoring](tree/S4_refactoring)
 
-1. move mock intitalization to setUp and tearDown methods.
-2. Create asserts and input data initialization methods
-3. Use same test data (simple type as string) for asserts and input data initialization
+The code works fine and our tests check it. There is one small (may be not so small) problem: The test code is not extandable. Before we continue to add more test cases, we need to refactor our test code and make it more flexible for future changes. 
+
+Here is what we do:
+ 1. move mock intitalization to setUp and tearDown methods.
+ 2. Create asserts and input data initialization methods
+ 3. Use same test data (simple type as string) for asserts and input data initialization
+
+Test case looks like this now [full source](blob/S4_refactoring/tests.py):
+```python
+class SaveNewUserTestCase(unittest.TestCase):
+    def setUp(self):
+        # Define, intialize and start mocks
+        ...
+
+    def tearDown(self):
+        # stop mocks
+        ...
+
+    def set_read_data(self, username='test user', email='test@test.com', raw=None):
+        # assign input test data to mock
+        ...
+
+    def assert_saved_data(self, username='Test user', email='test@test.com'):
+        # assert result data with expected data
+        ...
+
+    def check_if_data_was_readed(self):
+        # assert if data was readed from URL
+        ...
+
+    def call_target(self):
+        # perfrom tested code
+        ...
+
+    def test_success(self):
+        self.set_read_data('john', 'john@test.com')
+        self.call_target()
+        self.assert_saved_data('John', 'john@test.com')
+
+    def test_invalid_url_response_exception(self):
+        self.set_read_data(raw=b'Invalid string')
+        with self.assertRaises(ValueError):
+            self.call_target()
+```
 
 ## Step 5
+Branch: [S5_add_email_modification_rules](tree/S5_add_email_modification_rules)
 
-### 5.1
-Change email from format <first_name>.<last_Name>@enterprise.com to <F>.<last_name>@enterprise.com, where <F> - is first letter of <first_letter>
-Show tha now we can write tests very easy
 
-### 5.2
-Modify email domain from obsolete.com to "active.com"
-Show that logic becomes more complecated and we start to think about extract new function to filter e-mails.
+Lets assume that the client wants more changes and we get list with new requirements:
 
-## Step 6
-Refactoring.
-We create new function def modify_user(user) and new TestCase: ModifyUserTestCase for modify_user 
-We want to use common mocks and common input data and common output checkers.
+ 1. Change email from format <first_name>.<last_Name>@enterprise.com to <F>.<last_name>@enterprise.com, where <F> - is first letter of <first_letter>
+ 2. Modify email domain from obsolete.com to "active.com"
+ 
+ Here is modification in the code to meet the requirements above:
+ ```python
+address, domain = user_data['email'].split('@')
+if domain == 'enterprise.com':
+    first_name, last_name = address.split('.')
+    user_data['email'] = '{}.{}@{}'.format(first_name[0].capitalize(), last_name, domain)
 
-## Step 7
-modiy_user is shared function and called from another module. 
-We modify ModifyUserTestCase to completly isolated from SaveNewUserTestCase and test that we call modify_user with correct arguments from save_new_user  and from new function in other module.
+if domain == 'obsolete.com':
+    user_data['email'] = '{}@{}'.format(address, 'active.com')
+ ```
+
+And here is 2 new tests methods [full source](blob/S5_add_email_modification_rules/tests.py):
+```python
+def test_enterprise_domain_modification(self):
+    self.set_read_data(email='john.smith@enterprise.com')
+    self.call_target()
+    self.assert_saved_data(email='J.smith@enterprise.com')
+
+def test_obsolete_domain_modification(self):
+    self.set_read_data(email='test@obsolete.com')
+    self.call_target()
+    self.assert_saved_data(email='test@active.com')
+```
+
+As you see, new test methods are short and clear because of the refactoring in Step 4.
+
+## Step 6 Code refactoring
+Branch: [S6_extract_modify_email_method](tree/S6_extract_modify_email_method)
+
+
+The customer already asked us about 2 modification in email address and we expect a lot of requiests like this.
+So we decided to move email modification logic in the separate function in order to make our future changes more easy.
+
+The function looks like this now:
+```python
+def modify_email(email):
+    address, domain = email.split('@')
+    if domain == 'enterprise.com':
+        first_name, last_name = address.split('.')
+        return '{}.{}@{}'.format(first_name[0].capitalize(), last_name, domain)
+
+    if domain == 'obsolete.com':
+        return '{}@{}'.format(address, 'active.com')
+
+    return email
+```
+
+
+And we change also our tests accoring to changes in code.
+
+We split our TestCase class in 3:
+ 1. SaveNewUserBase - Abstract TestCase class to provide common methods and setup enviroment for tests.
+ 2. SaveNewUserTestCase - inherited from SaveNewUserBase and tests user creation and invalid input data handling.
+ 3. ModifyEmailTestCase - inherted from SaveNewUserBase and tests email modification ruls.
+
+[full source](blob/S6_extract_modify_email_method/tests.py)
+
+## Step 7 Test shared function
+Branch: [S7_isolate_tests_for_modify_email_method](tree/S7_isolate_tests_for_modify_email_method)
+
+And lets assume that modify_email function is so good that we want to use it in other part of our application.
+
+In this case modify_email does not depend only from save_new_user and we need to test it separatly, but also as part  of save_new_user scenario in order to be sure that it is called.
+
+New test for modify_email function looks like this [full source](blob/S6_extract_modify_email_method/tests.py)
+
